@@ -1,0 +1,4 @@
+*.cfg
+/Scripts/*
+/Include/*
+/Lib/*
