@@ -4,3 +4,4 @@
 /Lib/*
 /share/*
 /etc/*
+/__pycache__/*
