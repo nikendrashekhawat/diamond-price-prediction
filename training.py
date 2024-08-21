@@ -4,6 +4,7 @@ from pprint import pprint
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import figure
 from sklearn.base import RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, OneHotEncoder
@@ -21,7 +22,7 @@ from sklearn.neighbors._base import NeighborsBase
 from sklearn.inspection import permutation_importance
 
 
-def load_dataset(file: str, target= None, return_X_y= False, **kwargs):
+def load_dataset(file: str, target= None, return_X_y= False, **kwargs) -> pd.DataFrame | tuple:
     data = pd.read_csv(file, **kwargs)
     df = data.copy()
     if return_X_y:
@@ -46,9 +47,9 @@ def get_estimator_name(estimator)-> str:
     return name
 
 
-def get_TransformedTargetRegressor(estimator=None):
+def get_TransformedTargetRegressor(estimator=None, **kwargs):
     quantile = QuantileTransformer(output_distribution='normal')
-    ttr = TransformedTargetRegressor(regressor=estimator, transformer=quantile)
+    ttr = TransformedTargetRegressor(regressor=estimator, transformer=quantile, **kwargs)
     return ttr
 
 
@@ -65,7 +66,7 @@ def model_performance(fitted_estimator, X_test , y_true) -> pd.DataFrame:
     return df_scores
 
 
-def get_feature_importance(name, fitted_pipeline):
+def get_feature_importance(name, fitted_pipeline) -> pd.DataFrame:
     estimator = fitted_pipeline[-1]
     feature_names = fitted_pipeline[:-1].get_feature_names_out()
     
@@ -79,8 +80,6 @@ def get_feature_importance(name, fitted_pipeline):
         coeffiecients = estimator.feature_importances_
     if isinstance(estimator, BaseEnsemble):
         coeffiecients = estimator.feature_importances_
-    # if isinstance(estimator, NeighborsBase):
-    #     per = permutation_importance(estimator, )
     features_df = pd.DataFrame(data=coeffiecients, index=feature_names, columns=[name])
     return features_df
 
@@ -91,17 +90,20 @@ def get_knn_feature_importance(knn, X, y, **kwargs):
     return feature_imp
 
 
-def plot_feature_importance(df):
+def plot_feature_importance(df) -> figure:
     col_name = df.columns.tolist()[0]
     sorted_df = df.sort_values(col_name)
     fig, ax = plt.subplots(figsize=(6,8))
-    sorted_df.plot.barh(ax=ax, xlabel='Coefficients', title="Feature Importance in " + col_name, legend=False)
+    xlabel = "Coefficients"
+    if col_name in ['AdaBoostRegressor','DecisionTreeRegressor', 'ExtraTreesRegressor', 'RandomForestRegressor']:
+        xlabel = "Gini Importance"
+    sorted_df.plot.barh(ax=ax, xlabel=xlabel, title="Feature Importance in " + col_name, legend=False)
     ax.axvline(linestyle='--', color='k', linewidth=1)
     return fig
 
 
 def save_model(model, filepath= None, **kwargs) -> None:
-    if filepath:
+    if filepath: 
         model_name = os.path.join(filepath, get_estimator_name(model))
     else:
         model_name = get_estimator_name(model) 
