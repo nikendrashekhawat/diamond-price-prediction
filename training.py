@@ -1,9 +1,9 @@
-import numpy as np
-import pandas as pd
 import os
 import joblib
 from pprint import pprint
-from sklearn import set_config
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.base import RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, OneHotEncoder
@@ -12,9 +12,14 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn import metrics
 from sklearn.svm import LinearSVR
 from sklearn.linear_model import LinearRegression, SGDRegressor, Ridge, Lasso, ElasticNet
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import AdaBoostRegressor, ExtraTreesRegressor, RandomForestRegressor
+from sklearn.linear_model._base import LinearModel
+from sklearn.linear_model._stochastic_gradient import BaseSGD
+from sklearn.tree import DecisionTreeRegressor, BaseDecisionTree
+from sklearn.ensemble import BaseEnsemble, AdaBoostRegressor, ExtraTreesRegressor, RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neighbors._base import NeighborsBase
+from sklearn.inspection import permutation_importance
+
 
 def load_dataset(file: str, target= None, return_X_y= False, **kwargs):
     data = pd.read_csv(file, **kwargs)
@@ -25,6 +30,7 @@ def load_dataset(file: str, target= None, return_X_y= False, **kwargs):
         return X, y 
     else:
         return df
+
 
 def build_pipeline(transformer=None, estimator=None, **kwargs) -> Pipeline:
     pipe = make_pipeline(transformer, estimator, **kwargs)
@@ -39,10 +45,12 @@ def get_estimator_name(estimator)-> str:
         name = ("TransformedTarget_" + estimator[-1].regressor_.__class__.__name__)
     return name
 
+
 def get_TransformedTargetRegressor(estimator=None):
     quantile = QuantileTransformer(output_distribution='normal')
     ttr = TransformedTargetRegressor(regressor=estimator, transformer=quantile)
     return ttr
+
 
 def model_performance(fitted_estimator, X_test , y_true) -> pd.DataFrame:
     name = get_estimator_name(fitted_estimator)
@@ -56,13 +64,50 @@ def model_performance(fitted_estimator, X_test , y_true) -> pd.DataFrame:
     df_scores = pd.DataFrame(metrics_dict, index=[name])
     return df_scores
 
+
+def get_feature_importance(name, fitted_pipeline):
+    estimator = fitted_pipeline[-1]
+    feature_names = fitted_pipeline[:-1].get_feature_names_out()
+    
+    if isinstance(estimator, TransformedTargetRegressor):
+        coeffiecients = estimator.regressor_.coef_
+    if isinstance(estimator, LinearModel):
+        coeffiecients = estimator.coef_
+    if isinstance(estimator, BaseSGD):
+        coeffiecients = estimator.coef_
+    if isinstance(estimator, BaseDecisionTree):
+        coeffiecients = estimator.feature_importances_
+    if isinstance(estimator, BaseEnsemble):
+        coeffiecients = estimator.feature_importances_
+    # if isinstance(estimator, NeighborsBase):
+    #     per = permutation_importance(estimator, )
+    features_df = pd.DataFrame(data=coeffiecients, index=feature_names, columns=[name])
+    return features_df
+
+
+def get_knn_feature_importance(knn, X, y, **kwargs):
+    permutation_result = permutation_importance(knn, X, y)
+    feature_imp = permutation_result.importances_mean
+    return feature_imp
+
+
+def plot_feature_importance(df):
+    col_name = df.columns.tolist()[0]
+    sorted_df = df.sort_values(col_name)
+    fig, ax = plt.subplots(figsize=(6,8))
+    sorted_df.plot.barh(ax=ax, xlabel='Coefficients', title="Feature Importance in " + col_name, legend=False)
+    ax.axvline(linestyle='--', color='k', linewidth=1)
+    return fig
+
+
 def save_model(model, filepath= None, **kwargs) -> None:
     if filepath:
         model_name = os.path.join(filepath, get_estimator_name(model))
     else:
         model_name = get_estimator_name(model) 
     joblib.dump(model, model_name, **kwargs)
-    
+
+  
 def load_model(file, **kwargs):
     model = joblib.load(file, **kwargs)
     return model
@@ -124,5 +169,5 @@ if __name__ == '__main__':
         save_model(ttr_model, saving_directory)
         
     results_df = pd.concat(model_results, axis=0)
-    results_df.to_csv('./models_performance/performance_mterics.csv')
+    results_df.to_csv('./models_performance/performance_metrics.csv')
     pprint(model_scores)
