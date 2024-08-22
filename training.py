@@ -95,9 +95,11 @@ def plot_feature_importance(df) -> figure:
     sorted_df = df.sort_values(col_name)
     fig, ax = plt.subplots(figsize=(6,8))
     xlabel = "Coefficients"
+    title = "Feature Coefficients"
     if col_name in ['AdaBoostRegressor','DecisionTreeRegressor', 'ExtraTreesRegressor', 'RandomForestRegressor']:
         xlabel = "Gini Importance"
-    sorted_df.plot.barh(ax=ax, xlabel=xlabel, title="Feature Importance in " + col_name, legend=False)
+        title = "Feature Importance"
+    sorted_df.plot.barh(ax=ax, xlabel=xlabel, title=title, legend=False)
     ax.axvline(linestyle='--', color='k', linewidth=1)
     return fig
 

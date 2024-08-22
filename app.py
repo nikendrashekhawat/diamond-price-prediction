@@ -1,5 +1,3 @@
-import os
-import time
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -52,7 +50,7 @@ performance_df = pd.read_csv("./models_performance/performance_metrics.csv", ind
 
 st.title("Diamond Price Prediction :gem:")
 st.divider()
-tab1, tab2 = st.tabs(["Model Prediction", "Model Performance"])
+tab1, tab2 = st.tabs(["Prediction", "Model Performance"])
 with st.sidebar:
     selected_model = st.selectbox("Regression Models",
                  options=models_dict.keys(),
@@ -61,7 +59,11 @@ with st.sidebar:
 
 
 with tab1:    
-    st.subheader(f"Model :blue[{selected_model}] is selected for prediction") 
+    # st.subheader(f"Prediction with :blue[{selected_model}]") 
+    st.markdown(
+        f"<h2 style='text-align: center; color: dodgerblue;'>{selected_model}</h2>", 
+        unsafe_allow_html=True
+        ) 
     
     with st.form("input_features"):
         f_col1, f_col2, f_col3 = st.columns(3, gap='medium')
@@ -142,7 +144,12 @@ with tab1:
                 st.header(f"${prettify(prediction_str[0])}")
     
 with tab2:
-    st.subheader(f"Metrics of :blue[{selected_model}]:")
+    st.markdown(
+        f"<h2 style='text-align: center; color: dodgerblue;'>{selected_model}</h2>", 
+        unsafe_allow_html=True) 
+       
+    st.subheader("Metrics")
+    
     mcol1, mcol2, mcol3, mcol4 = st.columns(4, gap="medium")
     with mcol1.container(height=150):
         st.subheader("R-squared")
@@ -158,7 +165,10 @@ with tab2:
         st.subheader(f":gray-background[{performance_df.loc[selected_model, "Root Mean Squared Error"]}]")
     
     st.divider()
-    st.subheader("Feature Importance")
+    if selected_model in ['AdaBoostRegressor','DecisionTreeRegressor', 'ExtraTreesRegressor', 'RandomForestRegressor']:
+        st.subheader("Feature Importance")
+    else:
+        st.subheader("Feature Coefficient")
     
     if not isinstance(models_dict[selected_model][-1], NeighborsBase): 
         fig_feature_imp = (get_feature_importance(selected_model, models_dict[selected_model])
