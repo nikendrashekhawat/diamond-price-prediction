@@ -1,0 +1,4 @@
+,R-squared,Mean Absolute Error,Mean Squared Error,Root Mean Squared Error
+RandomForestRegressor,0.98,322.95,368929.83,607.4
+KNeighborsRegressor,0.97,330.8,397767.89,630.69
+TransformedTarget_Ridge,0.96,468.19,676879.25,822.73
