@@ -8,3 +8,4 @@ requests
 joblib
 pyarrow
 streamlit
+millify
