@@ -1,31 +1,26 @@
 from pathlib import Path
+import joblib
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
-from sklearn.neighbors._base import NeighborsBase
+from sklearn.metrics import PredictionErrorDisplay
+from sklearn.utils import shuffle
 from millify import prettify
-from training import get_feature_importance, plot_feature_importance
 from training import load_model, get_estimator_name
 
 st.set_page_config(layout="wide")
 
-sns.set_theme(
-    context="paper", 
-    style='dark', 
-    rc = {
-        'figure.facecolor' : '#EAEAF2',
-        'axes.edgecolor' : '0.25'
-        }
-    )
+sns.set_context("paper")
 
 @st.cache_data
-def get_filepath(directory):
+def get_filepath(directory) -> list[str]:
     file_paths = [file for file in directory.iterdir() if file.is_file()]
     return file_paths
 
 @st.cache_resource
-def get_model_dict(filepaths):
+def get_model_dict(filepaths) -> dict:
     models = {}
     for file in filepaths:
         m = load_model(file)
@@ -38,10 +33,57 @@ def check_nan(df) -> bool:
     return boolean
 
 @st.cache_data
-def get_nan_columns(df) -> list:
+def get_nan_columns(df) -> list[str]:
     nan_cols = [col for col in df.columns if df[col].isna().any()]
     return nan_cols
 
+
+def get_prediction_vs_actual(_model, X, y):
+    X, y = shuffle(X, y)
+    fig, ax = plt.subplots()
+    scatter_kwgs = {
+        "color": "steelblue",
+        "s": 15,
+        "edgecolor": "steelblue",
+        "alpha": 0.6
+    }
+    line_kwgs = {
+        "color": "red"
+    }
+    _ = PredictionErrorDisplay.from_estimator(
+        estimator=_model, 
+        X=X, 
+        y=y, 
+        ax = ax,
+        subsample=3000,
+        scatter_kwargs=scatter_kwgs,
+        kind="actual_vs_predicted",
+        line_kwargs=line_kwgs,
+        )
+    ax.set_title("Prediction vs Actual Values")
+    return fig
+
+def get_prediction_vs_residuals(_model, X, y):
+    X, y = shuffle(X, y)
+    fig, ax = plt.subplots()
+    scatter_kwgs = {
+        "color": "steelblue",
+        "s": 15,
+        "edgecolor": "steelblue",
+        "alpha": 0.6
+    }
+    _ = PredictionErrorDisplay.from_estimator(
+        estimator=_model, 
+        X=X, 
+        y=y, 
+        ax = ax,
+        subsample=3000,
+        scatter_kwargs=scatter_kwgs
+        )
+    ax.set_title("Prediction vs Residuals")
+    return fig
+    
+    
 
 model_directory = Path('./models')
 paths_to_model = get_filepath(model_directory)
@@ -59,39 +101,44 @@ with st.sidebar:
 
 
 with tab1:    
-    # st.subheader(f"Prediction with :blue[{selected_model}]") 
     st.markdown(
-        f"<h2 style='text-align: center; color: dodgerblue;'>{selected_model}</h2>", 
+        f"<h2 style='font-family: monospace; text-align: center; color: dodgerblue;'>{selected_model}</h2>", 
         unsafe_allow_html=True
         ) 
     
     with st.form("input_features"):
         f_col1, f_col2, f_col3 = st.columns(3, gap='medium')
         with f_col1:
-            carat = st.number_input( label="Carat",
+            carat = st.number_input(label="Carat",
                                     min_value=np.nan, 
-                                    key="carat"
+                                    key="carat",
+                                    max_value = 6.0
                                     )
             depth = st.number_input(label="depth",
                                     min_value=np.nan, 
-                                    key="depth"
+                                    key="depth", 
+                                    max_value=100.0
                                     )
             table = st.number_input(label="table",
                                     min_value=np.nan,
-                                    key='table'
+                                    key='table',
+                                    max_value=100.0
                                     )
         with f_col2:    
             x = st.number_input(label="X",
                                 min_value=np.nan,
-                                key='x'
+                                key='x',
+                                max_value=12.0
                                 )
             y = st.number_input(label="Y",
                                 min_value=np.nan, 
                                 key='y',
+                                max_value=70.0
                                 )
             z = st.number_input(label="Z",
                                 min_value=np.nan, 
-                                key='z'
+                                key='z',
+                                max_value=40.0
                                 )
         with f_col3: 
             cut = st.selectbox(label="Cut Quality", 
@@ -144,11 +191,12 @@ with tab1:
                 st.header(f"${prettify(prediction_str[0])}")
     
 with tab2:
+    
+    st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+
     st.markdown(
-        f"<h2 style='text-align: center; color: dodgerblue;'>{selected_model}</h2>", 
+        f"<h3 style='font-family: monospace;text-align: center;'>Metrics of {selected_model}</h3>", 
         unsafe_allow_html=True) 
-       
-    st.subheader("Metrics")
     
     mcol1, mcol2, mcol3, mcol4 = st.columns(4, gap="medium")
     with mcol1.container(height=150):
@@ -163,17 +211,25 @@ with tab2:
     with mcol4.container(height=150):
         st.subheader("RMSE")
         st.subheader(f":gray-background[{performance_df.loc[selected_model, "Root Mean Squared Error"]}]")
+        
+    st.markdown("<div style='margin-top: 50px;'></div>", unsafe_allow_html=True)
     
-    st.divider()
-    if selected_model in ['AdaBoostRegressor','DecisionTreeRegressor', 'ExtraTreesRegressor', 'RandomForestRegressor']:
-        st.subheader("Feature Importance")
-    else:
-        st.subheader("Feature Coefficient")
+    X_test = joblib.load("./datasets/X_test")
+    y_test = joblib.load("./datasets/y_test")
     
-    if not isinstance(models_dict[selected_model][-1], NeighborsBase): 
-        fig_feature_imp = (get_feature_importance(selected_model, models_dict[selected_model])
-                    .pipe(plot_feature_importance)
+    st.markdown(
+        f"<h3 style='font-family: monospace; text-align: center;'>Errors Viz of {selected_model} </h3>", 
+        unsafe_allow_html=True)
+    
+    fcol1, fcol2 = st.columns(2, gap="large")
+    
+    with fcol1:
+        st.pyplot(
+            get_prediction_vs_actual(models_dict[selected_model], X_test, y_test)
         )
-        with st.container(border=True):
-            st.pyplot(fig_feature_imp)
-        # st.bar_chart(data=f_imp, horizontal=True, width=800, use_container_width=False)
+    
+    with fcol2:
+        st.pyplot(
+            get_prediction_vs_residuals(models_dict[selected_model], X_test, y_test)
+        )
+    st.divider()
